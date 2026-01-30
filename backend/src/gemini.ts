@@ -84,7 +84,7 @@ export async function verifyPaymentSlipOnServer(
     : "";
 
   try {
-    const modelId = "gemini-3-flash-preview";
+    const modelId = "gemini-2.5-flash";
     const prompt = `
 FRAUD DETECTION TASK - Analyze this Myanmar mobile payment screenshot.
 Expected Payment: ${expectedAmount.toLocaleString()} MMK
@@ -239,10 +239,31 @@ IMPORTANT:
 
   } catch (error: any) {
     console.error("Verification Error:", error);
+
+    let reason = "Unknown error";
+    if (error.message) {
+      reason = error.message;
+      // Try to parse if it's a JSON string (common with Google GenAI)
+      if (reason.startsWith('{') || reason.includes('{"error":')) {
+        try {
+          // Sometimes error.message is just the JSON, sometimes it has text around it
+          const jsonMatch = reason.match(/{.*}/s);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.error && parsed.error.message) {
+              reason = parsed.error.message;
+            }
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+      }
+    }
+
     return {
       isValid: false,
       detectedAmount: 0,
-      reason: `Verification failed: ${error.message || "Unknown error"}`,
+      reason: `Verification failed: ${reason}`,
       confidence: 0
     };
   }

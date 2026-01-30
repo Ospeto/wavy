@@ -101,7 +101,24 @@ export async function photoHandler(ctx: BotContext) {
         const fileUrl = `https://api.telegram.org/file/bot${ctx.api.token}/${file.file_path}`;
 
         // Fetch and convert to base64
-        const response = await fetch(fileUrl);
+        // Fetch and convert to base64 with retry logic
+        let response;
+        let retries = 3;
+        while (retries > 0) {
+            try {
+                response = await fetch(fileUrl);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                break;
+            } catch (err) {
+                retries--;
+                if (retries === 0) throw err;
+                console.warn(`Fetch failed, retrying... (${retries} attempts left)`);
+                await new Promise(res => setTimeout(res, 1000));
+            }
+        }
+
+        if (!response) throw new Error("Failed to fetch image after retries");
+
         const buffer = await response.arrayBuffer();
         const base64 = Buffer.from(buffer).toString("base64");
 
@@ -219,12 +236,35 @@ ${t.thank_you}
 
             // Check if it's a rate limit error
             const isRateLimit = verificationResult.reason?.includes("429") || verificationResult.reason?.includes("RESOURCE_EXHAUSTED");
+            const isLocationError = verificationResult.reason?.includes("User location is not supported");
 
             const keyboard = new InlineKeyboard().url(t.contact_support, "https://t.me/ospeto");
 
-            const failMessage = isRateLimit
-                ? t.rate_limit_msg
-                : `${t.verification_failed}\n\n${verificationResult.reason}\n\n${verificationResult.fraudIndicators?.length ? verificationResult.fraudIndicators.map(f => `• ${f}`).join('\n') : ''}\n\n${t.tips_title}\n• ${t.tip_success}\n• ${t.tip_receipt}\n• ${t.tip_mismatch}\n\n${t.need_help}`;
+            let reasonMsg = verificationResult.reason;
+            // Sanitize reason to avoid Markdown errors if it contains JSON or weird chars
+            if (reasonMsg.includes('{') || reasonMsg.includes('}')) {
+                try {
+                    // Try to extract just the message if it's a JSON string
+                    const parsed = JSON.parse(reasonMsg);
+                    reasonMsg = parsed.error?.message || reasonMsg;
+                } catch {
+                    // unexpected format, just strip chars
+                    reasonMsg = reasonMsg.replace(/[{}"\[\]]/g, '');
+                }
+            }
+
+            // Escape special markdown chars for legacy V1
+            reasonMsg = reasonMsg.replace(/[_*`\[]/g, '\\$&');
+
+            let failMessage = "";
+
+            if (isRateLimit) {
+                failMessage = t.rate_limit_msg;
+            } else if (isLocationError) {
+                failMessage = "❌ *Service Unavailable*\n\nOur AI verification system is currently not available in this server region. Please contact support manually.";
+            } else {
+                failMessage = `${t.verification_failed}\n\n${reasonMsg}\n\n${t.tips_title}\n• ${t.tip_success}\n• ${t.tip_receipt}\n• ${t.tip_mismatch}\n\n${t.need_help}`;
+            }
 
             await ctx.reply(failMessage, {
                 parse_mode: "Markdown",
