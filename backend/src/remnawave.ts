@@ -77,6 +77,7 @@ interface RemnawaveCreateUserPayload {
   expireAt: string;
   description: string;
   activeInternalSquads: string[];
+  telegramId?: number;
 }
 
 interface RemnawaveUserResponse {
@@ -116,7 +117,8 @@ export async function createAccessKeyOnRemnawave(
     trafficLimitStrategy: "NO_RESET",
     expireAt,
     description: `Wavy: ${plan.name} | TG: ${telegramId || 'N/A'} | Tx: ${rawTxId}`,
-    activeInternalSquads: [VIP_SQUAD_UUID]
+    activeInternalSquads: [VIP_SQUAD_UUID],
+    telegramId: telegramId
   };
 
   const endpoint = `${apiUrl}/api/users`;
