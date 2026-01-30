@@ -117,6 +117,21 @@ function saveDb(db: Database): void {
     }, SAVE_DELAY_MS);
 }
 
+export function flushDb(): void {
+    if (saveTimeout) {
+        clearTimeout(saveTimeout);
+        saveTimeout = null;
+    }
+    if (dbCache) {
+        try {
+            fs.writeFileSync(dbPath, JSON.stringify(dbCache, null, 2));
+            console.log('💾 Database flushed to disk.');
+        } catch (error) {
+            console.error('Error flushing database:', error);
+        }
+    }
+}
+
 // Check if transaction ID already exists
 export function isTransactionUsed(transactionId: string): boolean {
     const db = loadDb();
@@ -272,6 +287,17 @@ export function getMonthlyRevenue(year: number, month: number): {
         keysSold: transactions.length,
         transactions
     };
+}
+
+export function resetTransactions(): void {
+    const db = loadDb();
+    db.transactions = [];
+    db.nextId = 1;
+    saveDb(db);
+    // Force cache invalidation
+    dbCache = null;
+    cacheTimestamp = 0;
+    console.log('🗑️ Transactions reset successfully');
 }
 
 console.log('📊 Database initialized at:', dbPath);

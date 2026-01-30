@@ -233,63 +233,83 @@ interface RemnawaveUsersResponse {
 export async function getAllRemnawaveUsers(): Promise<RemnawaveUser[]> {
   const apiUrl = config.remnawaveApiUrl.replace(/\/+$/, "");
   const apiKey = config.remnawaveApiKey;
-  const limit = 100;
-  let offset = 0;
-  let allUsers: RemnawaveUser[] = [];
-  let totalUsers = 0;
+  const pageSize = 25; // API's default/fixed limit
 
   try {
-    // Loop until we have fetched all users
-    while (true) {
-      // NestJS commonly uses 'take' and 'skip' for pagination
-      const endpoint = `${apiUrl}/api/users?take=${limit}&skip=${offset}`;
-
-      const data = await httpJson<RemnawaveUsersResponse>(endpoint, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          Accept: "application/json"
-        }
-      });
-
-      if (!data.response || !data.response.users || !Array.isArray(data.response.users)) {
-        console.error("Malformed Remnawave users response:", data);
-        break;
+    // 1. Fetch first page to get metadata
+    console.log(`[Pagination] Fetching initial page...`);
+    const firstPageData = await httpJson<RemnawaveUsersResponse>(`${apiUrl}/api/users?skip=0`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json"
       }
+    });
 
-      const users = data.response.users;
-      allUsers = allUsers.concat(users);
-      totalUsers = data.response.total || 0;
-
-      // If we received fewer users than the limit, we've reached the end
-      if (users.length < limit) {
-        break;
-      }
-
-      // Also break if we have fetched equal to or more than total (safety check)
-      if (totalUsers > 0 && allUsers.length >= totalUsers) {
-        break;
-      }
-
-      offset += limit;
+    if (!firstPageData.response?.users) {
+      throw new Error("Invalid response from Remnawave API");
     }
 
-    // Log for debugging
-    console.log(`Fetched ${allUsers.length} users from Remnawave (Total reported: ${totalUsers})`);
+    let allUsers = [...firstPageData.response.users];
+    const totalUsers = firstPageData.response.total || 0;
+
+    console.log(`[Pagination] Initial fetch: ${allUsers.length}/${totalUsers} users`);
+
+    if (allUsers.length >= totalUsers || allUsers.length === 0) {
+      return allUsers;
+    }
+
+    // 2. Calculate remaining pages
+    const remainingOffsets: number[] = [];
+    for (let skip = pageSize; skip < totalUsers; skip += pageSize) {
+      remainingOffsets.push(skip);
+    }
+
+    // 3. Parallel fetch with concurrency limit
+    const CONCURRENCY = 5;
+    const errors: any[] = [];
+
+    // Helper to fetch a single page
+    const fetchPage = async (skip: number) => {
+      try {
+        const data = await httpJson<RemnawaveUsersResponse>(`${apiUrl}/api/users?skip=${skip}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            Accept: "application/json"
+          }
+        });
+        if (data.response?.users) {
+          return data.response.users;
+        }
+        return [];
+      } catch (err) {
+        console.error(`[Pagination] Error fetching skip=${skip}:`, err);
+        errors.push(err);
+        return [];
+      }
+    };
+
+    // Process in chunks
+    for (let i = 0; i < remainingOffsets.length; i += CONCURRENCY) {
+      const chunk = remainingOffsets.slice(i, i + CONCURRENCY);
+      console.log(`[Pagination] Fetching chunk ${i / CONCURRENCY + 1} (offsets ${chunk.join(', ')})...`);
+
+      const results = await Promise.all(chunk.map(skip => fetchPage(skip)));
+      results.forEach(users => allUsers = allUsers.concat(users));
+    }
+
+    console.log(`[Pagination] COMPLETE: Fetched ${allUsers.length}/${totalUsers} users.`);
+    if (errors.length > 0) {
+      console.warn(`[Pagination] Completed with ${errors.length} errors.`);
+    }
 
     return allUsers;
 
   } catch (error: any) {
-    if (error instanceof HttpError) {
-      console.error("Failed to fetch Remnawave users:", {
-        status: error.status,
-        message: error.message
-      });
-    } else {
-      console.error("Unexpected error fetching Remnawave users:", error);
-    }
-    // Return whatever we managed to fetch so far, or empty logic handles it
-    return allUsers;
+    console.error("[Pagination] Critical Error:", error);
+    return [];
   }
 }

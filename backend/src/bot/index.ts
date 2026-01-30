@@ -5,13 +5,14 @@ import { plansHandler, planCallbackHandler } from "./handlers/plans.js";
 import { paymentCallbackHandler } from "./handlers/payment.js";
 import { photoHandler } from "./handlers/verify.js";
 import { helpHandler } from "./handlers/help.js";
-import { adminHandler, adminTxHandler, addPromoHandler, adminPlansHandler, adminRevenueHandler } from "./handlers/admin.js";
+import { adminHandler, adminTxHandler, addPromoHandler, adminPlansHandler, adminRevenueHandler, adminResetTxHandler, handleAdminCallback, startMonthlyReportScheduler } from "./handlers/admin.js";
 import { translations } from "./translations.js";
 import {
     getPromoCode,
     createTransaction,
     updateTransactionVerified,
-    incrementPromoCodeUsage
+    incrementPromoCodeUsage,
+    flushDb
 } from "../database.js";
 import { createAccessKeyOnRemnawave, ServicePlan } from "../remnawave.js";
 import { SERVICE_PLANS } from "./constants.js";
@@ -78,6 +79,7 @@ bot.command("admin_tx", adminTxHandler);
 bot.command("addpromo", addPromoHandler);
 bot.command("admin_plans", adminPlansHandler);
 bot.command("admin_revenue", adminRevenueHandler);
+bot.command("admin_reset_tx", adminResetTxHandler);
 bot.command("language", async (ctx) => {
     const { InlineKeyboard } = await import("grammy");
     const keyboard = new InlineKeyboard()
@@ -102,6 +104,7 @@ bot.callbackQuery(/^set_lang:/, async (ctx) => {
 // Callback queries (button clicks)
 bot.callbackQuery(/^plan:/, planCallbackHandler);
 bot.callbackQuery(/^pay:/, paymentCallbackHandler);
+bot.callbackQuery(/^admin_/, handleAdminCallback);
 
 bot.callbackQuery(/^claim_free:/, async (ctx) => {
     const lang = ctx.session.language || 'en';
@@ -283,7 +286,20 @@ console.log("🤖 Starting Wavy Telegram Bot...");
 bot.start({
     onStart: (botInfo) => {
         console.log(`✅ Bot @${botInfo.username} is running!`);
+        // Start monthly auto-report scheduler
+        startMonthlyReportScheduler(bot);
     }
 });
 
 export { bot, BotContext, SessionData };
+
+// Graceful shutdown
+const cleanup = async () => {
+    console.log('🛑 Stopping bot...');
+    await bot.stop();
+    flushDb();
+    process.exit(0);
+};
+
+process.once('SIGINT', cleanup);
+process.once('SIGTERM', cleanup);

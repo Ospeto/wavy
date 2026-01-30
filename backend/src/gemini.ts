@@ -84,7 +84,7 @@ export async function verifyPaymentSlipOnServer(
     : "";
 
   try {
-    const modelId = "gemini-2.0-flash";
+    const modelId = "gemini-3-flash-preview";
     const prompt = `
 FRAUD DETECTION TASK - Analyze this Myanmar mobile payment screenshot.
 Expected Payment: ${expectedAmount.toLocaleString()} MMK
