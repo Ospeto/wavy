@@ -1,9 +1,10 @@
-import { Context, SessionFlavor } from "grammy";
+import { Context, SessionFlavor, InlineKeyboard } from "grammy";
 import { config } from "../../config.js";
 import { getRecentTransactions, getTransactionStats, addPromoCode, getMonthlyRevenue, resetTransactions } from "../../database.js";
 import { SERVICE_PLANS } from "../constants.js";
 import { SessionData, BotContext } from "../types.js";
 import { getAllRemnawaveUsers, RemnawaveUser } from "../../remnawave.js";
+import { getGeminiModel, setGeminiModel } from "../../database.js";
 
 function isAdmin(ctx: BotContext): boolean {
     const userId = ctx.from?.id?.toString();
@@ -11,6 +12,7 @@ function isAdmin(ctx: BotContext): boolean {
     return config.adminUserIds.includes(userId);
 }
 
+// --- Admin Dashboard ---
 export async function adminHandler(ctx: BotContext) {
     if (!isAdmin(ctx)) {
         console.log(`🚫 Unauthorized admin access attempt by ${ctx.from?.id}`);
@@ -19,30 +21,187 @@ export async function adminHandler(ctx: BotContext) {
 
     const stats = getTransactionStats();
 
-    // Using backticks for commands and escaping underscores
     const message = `
-📊 *Wavy System Stats*
+📊 *Wavy System Dashboard*
 
-💰 *Transactions:*
-• Total: \`${stats.total}\`
-• Completed: ✅ \`${stats.completed}\`
-• Failed: ❌ \`${stats.failed}\`
-• Pending: ⏳ \`${stats.pending}\`
+💰 *Key Metrics:*
+• Total Txs: \`${stats.total}\`
+• Revenue: \`${stats.totalRevenue?.toLocaleString() || 0}\` MMK
+• Pending: \`${stats.pending}\`
+• Failed: \`${stats.failed}\`
 
-🛠 *Admin Commands:*
-\`/admin\` - This summary
-\`/admin_tx\` - Recent 10 transactions
-\`/addpromo <code> <%discount> <limit> <days> [plan_id]\`
-\`/admin_plans\` - List all plan IDs
-\`/admin_revenue [month] [year]\` - Revenue report
+👇 *Select an action:*
 `;
 
+    const keyboard = new InlineKeyboard()
+        .text("📊 Revenue Report", "admin_rev_init")
+        .text("📝 Transactions", "admin_tx_list")
+        .row()
+        .text("⚙️ AI Model", "admin_model_menu")
+        .text("📋 View Plans", "admin_plans_list")
+        .row()
+        .text("🗑️ Reset DB", "admin_reset_init");
+
     try {
-        await ctx.reply(message, { parse_mode: "Markdown" });
+        await ctx.reply(message, { parse_mode: "Markdown", reply_markup: keyboard });
     } catch (error) {
-        console.error("Markdown V1 failed, falling back to plain text:", error);
-        await ctx.reply(message.replace(/\*/g, "").replace(/`/g, ""));
+        console.error("Dashboard error:", error);
+        await ctx.reply("Error loading dashboard.");
     }
+}
+
+// --- Callback Router ---
+export async function handleAdminCallback(ctx: BotContext) {
+    const callbackData = (ctx.callbackQuery as any)?.data as string;
+
+    if (!callbackData || !isAdmin(ctx)) {
+        await ctx.answerCallbackQuery();
+        return;
+    }
+
+    // Dashboard
+    if (callbackData === 'admin_home') {
+        const stats = getTransactionStats();
+        const message = `
+📊 *Wavy System Dashboard*
+
+💰 *Key Metrics:*
+• Total Txs: \`${stats.total}\`
+• Revenue: \`${stats.totalRevenue?.toLocaleString() || 0}\` MMK
+• Pending: \`${stats.pending}\`
+• Failed: \`${stats.failed}\`
+
+👇 *Select an action:*
+`;
+        const keyboard = new InlineKeyboard()
+            .text("📊 Revenue Report", "admin_rev_init")
+            .text("📝 Transactions", "admin_tx_list")
+            .row()
+            .text("⚙️ AI Model", "admin_model_menu")
+            .text("📋 View Plans", "admin_plans_list")
+            .row()
+            .text("🗑️ Reset DB", "admin_reset_init");
+
+        await ctx.editMessageText(message, { parse_mode: "Markdown", reply_markup: keyboard });
+        await ctx.answerCallbackQuery();
+        return;
+    }
+
+    // Reset Flow
+    if (callbackData === 'admin_reset_init') {
+        const keyboard = new InlineKeyboard()
+            .text("✅ Confirm Reset", "admin_reset_tx_confirm")
+            .row()
+            .text("🔙 Cancel", "admin_home");
+
+        await ctx.editMessageText(`⚠️ *DANGER ZONE*\n\nAre you sure you want to delete ALL transaction history? This cannot be undone.`, {
+            parse_mode: "Markdown",
+            reply_markup: keyboard
+        });
+        await ctx.answerCallbackQuery();
+    }
+
+    else if (callbackData === 'admin_reset_tx_confirm') {
+        resetTransactions();
+        await ctx.answerCallbackQuery({ text: "✅ Reset Complete!" });
+        await ctx.editMessageText("✅ All transaction history has been wiped.", {
+            reply_markup: new InlineKeyboard().text("🔙 Back to Dashboard", "admin_home")
+        });
+    }
+
+    // Model Menu Flow
+    else if (callbackData === 'admin_model_menu') {
+        await showModelMenu(ctx);
+    }
+    else if (callbackData.startsWith('admin_set_model:')) {
+        const model = callbackData.split(':')[1];
+        setGeminiModel(model);
+        await ctx.answerCallbackQuery({ text: `Model set to ${model}` });
+        await showModelMenu(ctx); // Refresh menu to show selection
+    }
+
+    // Transactions Flow
+    else if (callbackData === 'admin_tx_list') {
+        // Re-use existing handler logic but adapted for callback
+        await adminTxHandler(ctx);
+        await ctx.answerCallbackQuery();
+    }
+
+    // Plans Flow
+    else if (callbackData === 'admin_plans_list') {
+        // Re-use existing handler logic
+        await adminPlansHandler(ctx);
+        await ctx.answerCallbackQuery();
+    }
+
+    // Revenue Flow initialization
+    else if (callbackData === 'admin_rev_init') {
+        const now = new Date();
+        await showRevenueReport(ctx, now.getMonth() + 1, now.getFullYear());
+    }
+    // Revenue Navigation
+    else if (callbackData.startsWith('admin_rev:')) {
+        // Format: admin_rev:month:year
+        const parts = callbackData.split(':');
+        const month = parseInt(parts[1]);
+        const year = parseInt(parts[2]);
+        await showRevenueReport(ctx, month, year);
+    }
+}
+
+// --- Admin Sub-Handlers (Interactive) ---
+
+async function showModelMenu(ctx: BotContext) {
+    const currentModel = getGeminiModel();
+    const validModels = [
+        "gemini-2.5-flash",
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview"
+    ];
+
+    let msg = `🤖 *AI Model Configuration*\n\nCurrent Active Model: \`${currentModel}\`\n\nTap a model to activate it:`;
+
+    const keyboard = new InlineKeyboard();
+    validModels.forEach(m => {
+        const label = m === currentModel ? `✅ ${m}` : `⚪️ ${m}`;
+        keyboard.text(label, `admin_set_model:${m}`).row();
+    });
+    keyboard.text("🔙 Back", "admin_home");
+
+    try {
+        await ctx.editMessageText(msg, { parse_mode: "Markdown", reply_markup: keyboard });
+    } catch (e) {
+        // If message to edit is not found or content same, or triggered via command
+        await ctx.reply(msg, { parse_mode: "Markdown", reply_markup: keyboard });
+    }
+}
+
+async function showRevenueReport(ctx: BotContext, month: number, year: number) {
+    // Handle month overflow/underflow
+    if (month > 12) { month = 1; year++; }
+    if (month < 1) { month = 12; year--; }
+
+    const report = await generateMonthlyReport(year, month);
+
+    const keyboard = new InlineKeyboard()
+        .text("⬅️ Prev", `admin_rev:${month - 1}:${year}`)
+        .text("Next ➡️", `admin_rev:${month + 1}:${year}`)
+        .row()
+        .text("🔙 Back to Dashboard", "admin_home");
+
+    const header = `📅 *Revenue Browser* (${month}/${year})\n\n`;
+
+    try {
+        await ctx.editMessageText(header + report, { parse_mode: "Markdown", reply_markup: keyboard });
+        await ctx.answerCallbackQuery();
+    } catch (e) {
+        await ctx.reply(header + report, { parse_mode: "Markdown", reply_markup: keyboard });
+    }
+}
+
+export async function adminModelHandler(ctx: BotContext) {
+    if (!isAdmin(ctx)) return;
+    await showModelMenu(ctx);
 }
 
 export async function adminTxHandler(ctx: BotContext) {
@@ -249,227 +408,30 @@ function estimatePlanFromUser(user: RemnawaveUser): PlanEstimate {
     }
 }
 
+// --- Legacy Command Wrappers (Redirect to Interactive UI) ---
+
 export async function adminRevenueHandler(ctx: BotContext) {
     if (!isAdmin(ctx)) return;
-
-    // Parse arguments: /admin_revenue [month] [year]
-    const args = ctx.message?.text?.split(/\s+/) || [];
     const now = new Date();
-    let month = now.getMonth() + 1; // 1-12
-    let year = now.getFullYear();
-
-    if (args[1]) {
-        const parsedMonth = parseInt(args[1]);
-        if (parsedMonth >= 1 && parsedMonth <= 12) {
-            month = parsedMonth;
-        }
-    }
-    if (args[2]) {
-        const parsedYear = parseInt(args[2]);
-        if (parsedYear >= 2020 && parsedYear <= 2100) {
-            year = parsedYear;
-        }
-    }
-
-    const monthName = MONTH_NAMES[month - 1];
-    await ctx.reply(`⏳ Generating revenue report for ${monthName} ${year}...`);
-
-    // 1. Bot Revenue (from transactions.json)
-    const botRevenue = getMonthlyRevenue(year, month);
-
-    // 2. Panel Revenue (from Remnawave API)
-    let panelUsers: RemnawaveUser[] = [];
-    let panelNewThisMonth = 0;
-    let panelActiveThisMonth = 0;
-    let panelEstimatedRevenue = 0;
-    const panelPlanBreakdown: Record<string, { count: number; revenue: number; name: string }> = {};
-
-    try {
-        panelUsers = await getAllRemnawaveUsers();
-
-        // Get first and last day of target month for filtering
-        const monthStart = new Date(year, month - 1, 1);
-        const monthEnd = new Date(year, month, 0, 23, 59, 59);
-
-        // NEW subscriptions created in this month (revenue is counted here)
-        const usersCreatedThisMonth = panelUsers.filter(u => {
-            const created = new Date(u.createdAt);
-            return created.getFullYear() === year && (created.getMonth() + 1) === month;
-        });
-
-        // ACTIVE subscriptions (bought before/during this month, still valid)
-        const usersActiveThisMonth = panelUsers.filter(u => {
-            const created = new Date(u.createdAt);
-            const expires = new Date(u.expireAt);
-            return created <= monthEnd && expires >= monthStart;
-        });
-
-        panelNewThisMonth = usersCreatedThisMonth.length;
-        panelActiveThisMonth = usersActiveThisMonth.length;
-
-        // Bot-generated usernames follow pattern: username_4digits_4hex (e.g., Rennzy0099_3838_45ea)
-        const botUsernamePattern = /^.+_[a-zA-Z0-9]{4}_[a-f0-9]{4}$/;
-
-        // Revenue is ONLY from users created this month
-        // Exclude bot users (username matches bot pattern)
-        for (const user of usersCreatedThisMonth) {
-            const isBotUser = botUsernamePattern.test(user.username);
-
-            if (!isBotUser) {
-                const planInfo = estimatePlanFromUser(user);
-                panelEstimatedRevenue += planInfo.price;
-
-                // Track plan breakdown for panel sales
-                const planKey = planInfo.name;
-                if (!panelPlanBreakdown[planKey]) {
-                    panelPlanBreakdown[planKey] = { count: 0, revenue: 0, name: planInfo.name };
-                }
-                panelPlanBreakdown[planKey].count++;
-                panelPlanBreakdown[planKey].revenue += planInfo.price;
-            }
-        }
-    } catch (error) {
-        console.error("Failed to fetch panel users for revenue report:", error);
-    }
-
-    // --- Plan Breakdown (Bot Sales Only) ---
-    const planBreakdown: Record<string, { count: number; revenue: number; name: string }> = {};
-    for (const tx of botRevenue.transactions) {
-        const planId = tx.plan_id || 'unknown';
-        const plan = SERVICE_PLANS.find(p => p.id === planId);
-        const planName = plan?.nameEN || planId;
-
-        if (!planBreakdown[planId]) {
-            planBreakdown[planId] = { count: 0, revenue: 0, name: planName };
-        }
-        planBreakdown[planId].count++;
-        planBreakdown[planId].revenue += tx.amount || 0;
-    }
-
-    // Format plan breakdown lines
-    const planLines = Object.values(planBreakdown)
-        .sort((a, b) => b.revenue - a.revenue)
-        .map(p => `├ ${p.name}: ${p.count} keys (${p.revenue.toLocaleString()} MMK)`)
-        .join('\n');
-
-    // Format panel plan breakdown lines
-    const panelPlanLines = Object.values(panelPlanBreakdown)
-        .sort((a, b) => b.revenue - a.revenue)
-        .map(p => `├ ${p.name}: ${p.count} keys (${p.revenue.toLocaleString()} MMK)`)
-        .join('\n');
-
-    // Format numbers
-    const formatMMK = (n: number) => n.toLocaleString() + " MMK";
-
-    const message = `
-📊 *Revenue Report - ${monthName} ${year}*
-
-🤖 *Bot Sales:*
-├ Keys Sold: \`${botRevenue.keysSold}\`
-├ Revenue: \`${formatMMK(botRevenue.totalRevenue)}\`
-└ Avg/Key: \`${botRevenue.keysSold > 0 ? formatMMK(Math.round(botRevenue.totalRevenue / botRevenue.keysSold)) : 'N/A'}\`
-
-📦 *Bot Sales By Plan:*
-${planLines || '└ No sales'}
-
-🌐 *Panel Direct Sales (Estimated):*
-├ Users: \`${Math.max(0, panelNewThisMonth - botRevenue.keysSold)}\`
-├ Revenue: \`${formatMMK(panelEstimatedRevenue)}\`
-
-📦 *Panel Sales By Plan:*
-${panelPlanLines || '└ No sales'}
-
-📈 *Combined Revenue:* \`${formatMMK(botRevenue.totalRevenue + panelEstimatedRevenue)}\`
-
-📋 *Stats:*
-├ Active Users: \`${panelActiveThisMonth}\`
-└ Total Users: \`${panelUsers.length}\`
-
-💡 /admin\\_revenue [month] [year]
-`;
-
-    await ctx.reply(message, { parse_mode: "Markdown" });
+    // Default to current month, arguments ignored in favor of interactive UI
+    await showRevenueReport(ctx, now.getMonth() + 1, now.getFullYear());
 }
 
-// Reset transactions command
 export async function adminResetTxHandler(ctx: BotContext) {
     if (!isAdmin(ctx)) return;
 
-    const args = ctx.message?.text?.split(/\s+/) || [];
+    // Redirect to the interactive reset flow
+    const keyboard = new InlineKeyboard()
+        .text("✅ Confirm Reset", "admin_reset_tx_confirm")
+        .row()
+        .text("🔙 Cancel", "admin_home");
 
-    // Require explicit confirmation
-    if (args[1] !== 'confirm') {
-        await ctx.reply(`⚠️ *သတိပေးချက်*\n\nTransaction မှတ်တမ်းအားလုံး ဖျက်ပစ်မှာပါ။\n\nအတည်ပြုရန်: \`/admin_reset_tx confirm\``, {
-            parse_mode: "Markdown",
-            reply_markup: {
-                inline_keyboard: [[
-                    { text: "✅ Confirm Reset", callback_data: "admin_reset_tx_confirm" }
-                ]]
-            }
-        });
-        return;
-    }
-
-    resetTransactions();
-    await ctx.reply("✅ Transaction မှတ်တမ်းအားလုံး ဖျက်ပြီးပါပြီ။");
+    await ctx.reply(`⚠️ *DANGER ZONE*\n\nAre you sure you want to delete ALL transaction history? This cannot be undone.`, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard
+    });
 }
 
-// Handle callback for reset confirmation
-export async function handleAdminCallback(ctx: BotContext) {
-    const callbackData = (ctx.callbackQuery as any)?.data;
-
-    if (!callbackData || !isAdmin(ctx)) {
-        await ctx.answerCallbackQuery();
-        return;
-    }
-
-    if (callbackData === 'admin_reset_tx_confirm') {
-        resetTransactions();
-        await ctx.answerCallbackQuery({ text: "✅ Reset Complete!" });
-        await ctx.editMessageText("✅ Transaction မှတ်တမ်းအားလုံး ဖျက်ပြီးပါပြီ။");
-    }
-}
-
-// --- Gemini Model Management ---
-import { getGeminiModel, setGeminiModel } from "../../database.js";
-
-export async function adminModelHandler(ctx: BotContext) {
-    if (!isAdmin(ctx)) return;
-
-    const args = ctx.message?.text?.split(/\s+/);
-    const validModels = [
-        "gemini-2.5-flash",
-        "gemini-3-pro-preview",
-        "gemini-3-flash-preview"
-    ];
-
-    // If no args, show current model
-    if (!args || args.length < 2) {
-        const currentModel = getGeminiModel();
-        const msg = `
-🤖 *Gemini Model Configuration*
-
-Current Model: \`${currentModel}\`
-
-*Available Models:*
-${validModels.map(m => `• \`${m}\``).join('\n')}
-
-Usage: \`/admin_model <model_name>\`
-`;
-        await ctx.reply(msg, { parse_mode: "Markdown" });
-        return;
-    }
-
-    const newModel = args[1].trim();
-
-    if (!validModels.includes(newModel)) {
-        await ctx.reply(`❌ Invalid model name.\n\n*Available:* \n${validModels.map(m => `\`${m}\``).join('\n')}`, { parse_mode: "Markdown" });
-        return;
-    }
-
-    setGeminiModel(newModel);
-    await ctx.reply(`✅ *Success!* Gemini model set to: \`${newModel}\``, { parse_mode: "Markdown" });
-}
 
 // Generate monthly report message (standalone, no context needed)
 export async function generateMonthlyReport(year: number, month: number): Promise<string> {

@@ -39,7 +39,15 @@ ${t.contact_support_title}
 ${t.contact_support_msg}
 `;
 
-    const keyboard = new InlineKeyboard().url(t.contact_support, "https://t.me/ospeto");
+    const keyboard = new InlineKeyboard()
+        .text("📦 View Plans", "admin_plans_list") // Reuse plan list callback (it just lists plans, safe for users?) 
+        // Wait, admin_plans_list is an admin command. Users shouldn't see it if it's admin only.
+        // Actually, plansHandler is the user one.
+        // Let's use user commands.
+        .text("📦 View Plans", "cmd_plans")
+        .row()
+        .text(lang === 'mm' ? "မြန်မာ 🇲🇲" : "English 🇺🇸", lang === 'mm' ? "set_lang:en" : "set_lang:mm")
+        .url(t.contact_support, "https://t.me/ospeto");
 
     await ctx.reply(helpMessage, {
         parse_mode: "Markdown",

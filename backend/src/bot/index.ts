@@ -105,7 +105,12 @@ bot.callbackQuery(/^set_lang:/, async (ctx) => {
 // Callback queries (button clicks)
 bot.callbackQuery(/^plan:/, planCallbackHandler);
 bot.callbackQuery(/^pay:/, paymentCallbackHandler);
+
+// Admin callbacks (dashboard, model, revenue, reset)
 bot.callbackQuery(/^admin_/, handleAdminCallback);
+
+// Help menu callbacks
+bot.callbackQuery("cmd_plans", plansHandler);
 
 bot.callbackQuery(/^claim_free:/, async (ctx) => {
     const lang = ctx.session.language || 'en';

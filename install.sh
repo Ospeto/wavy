@@ -141,6 +141,18 @@ EOF
     echo ""
 fi
 
+# Update source code
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${YELLOW}Checking for updates...${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+if command -v git &> /dev/null; then
+    echo -e "${YELLOW}Pulling latest changes...${NC}"
+    git pull || echo -e "${RED}⚠ Failed to pull latest changes. Continuing with current version...${NC}"
+else
+    echo -e "${YELLOW}⚠ Git is not installed. Skipping update check.${NC}"
+fi
+echo ""
+
 # Build and deploy
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${YELLOW}Building and deploying Wavy Bot...${NC}"
