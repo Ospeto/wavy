@@ -35,24 +35,33 @@ export async function startHandler(ctx: BotContext) {
     const threeMonth = SERVICE_PLANS.filter(p => p.type === "THREE_MONTHS");
     const sixMonth = SERVICE_PLANS.filter(p => p.type === "SIX_MONTHS");
 
+    // Helper to format price
+    const formatPrice = (price: number) => {
+        if (ctx.session.discountApplied) {
+            const discounted = Math.floor(price * (1 - ctx.session.discountApplied / 100));
+            return `~${price.toLocaleString()}~ ${discounted.toLocaleString()} MMK`;
+        }
+        return `${price.toLocaleString()} MMK`;
+    };
+
     // Add 1 month plans
     oneMonth.forEach(plan => {
         const name = ctx.session.language === 'mm' ? plan.nameMM : plan.nameEN;
-        keyboard.text(`📦 ${name} - ${plan.price.toLocaleString()} MMK`, `plan:${plan.id}`);
+        keyboard.text(`📦 ${name} - ${formatPrice(plan.price)}`, `plan:${plan.id}`);
         keyboard.row();
     });
 
     // Add 3 month plans
     threeMonth.forEach(plan => {
         const name = ctx.session.language === 'mm' ? plan.nameMM : plan.nameEN;
-        keyboard.text(`📦 ${name} - ${plan.price.toLocaleString()} MMK`, `plan:${plan.id}`);
+        keyboard.text(`📦 ${name} - ${formatPrice(plan.price)}`, `plan:${plan.id}`);
         keyboard.row();
     });
 
     // Add 6 month plans
     sixMonth.forEach(plan => {
         const name = ctx.session.language === 'mm' ? plan.nameMM : plan.nameEN;
-        keyboard.text(`📦 ${name} - ${plan.price.toLocaleString()} MMK`, `plan:${plan.id}`);
+        keyboard.text(`📦 ${name} - ${formatPrice(plan.price)}`, `plan:${plan.id}`);
         keyboard.row();
     });
 
