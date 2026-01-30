@@ -210,3 +210,53 @@ export async function createAccessKeyOnRemnawave(
   }
   throw new Error("Failed to create Remnawave access key after multiple retries.");
 }
+
+// --- Fetch All Users for Revenue Reports ---
+export interface RemnawaveUser {
+  uuid: string;
+  username: string;
+  status: string;
+  trafficLimitBytes: number;
+  usedTrafficBytes: number;
+  createdAt: string;
+  expireAt: string;
+  description?: string;
+}
+
+interface RemnawaveUsersResponse {
+  response: RemnawaveUser[];
+}
+
+export async function getAllRemnawaveUsers(): Promise<RemnawaveUser[]> {
+  const apiUrl = config.remnawaveApiUrl.replace(/\/+$/, "");
+  const apiKey = config.remnawaveApiKey;
+  const endpoint = `${apiUrl}/api/users`;
+
+  try {
+    const data = await httpJson<RemnawaveUsersResponse>(endpoint, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json"
+      }
+    });
+
+    if (!data.response || !Array.isArray(data.response)) {
+      console.error("Malformed Remnawave users response:", data);
+      return [];
+    }
+
+    return data.response;
+  } catch (error: any) {
+    if (error instanceof HttpError) {
+      console.error("Failed to fetch Remnawave users:", {
+        status: error.status,
+        message: error.message
+      });
+    } else {
+      console.error("Unexpected error fetching Remnawave users:", error);
+    }
+    return [];
+  }
+}

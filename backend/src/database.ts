@@ -250,4 +250,28 @@ export function getTransactionStats(): { total: number; completed: number; faile
     };
 }
 
+// --- Revenue Reports ---
+export function getTransactionsByMonth(year: number, month: number): TransactionRecord[] {
+    const db = loadDb();
+    return db.transactions.filter(t => {
+        if (t.status !== 'completed') return false;
+        const date = new Date(t.created_at);
+        return date.getFullYear() === year && (date.getMonth() + 1) === month;
+    });
+}
+
+export function getMonthlyRevenue(year: number, month: number): {
+    totalRevenue: number;
+    keysSold: number;
+    transactions: TransactionRecord[]
+} {
+    const transactions = getTransactionsByMonth(year, month);
+    const totalRevenue = transactions.reduce((sum, t) => sum + (t.amount || 0), 0);
+    return {
+        totalRevenue,
+        keysSold: transactions.length,
+        transactions
+    };
+}
+
 console.log('📊 Database initialized at:', dbPath);

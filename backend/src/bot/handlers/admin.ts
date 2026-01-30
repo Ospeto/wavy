@@ -1,8 +1,9 @@
 import { Context, SessionFlavor } from "grammy";
 import { config } from "../../config.js";
-import { getRecentTransactions, getTransactionStats, addPromoCode } from "../../database.js";
+import { getRecentTransactions, getTransactionStats, addPromoCode, getMonthlyRevenue } from "../../database.js";
 import { SERVICE_PLANS } from "../constants.js";
 import { SessionData, BotContext } from "../types.js";
+import { getAllRemnawaveUsers, RemnawaveUser } from "../../remnawave.js";
 
 function isAdmin(ctx: BotContext): boolean {
     const userId = ctx.from?.id?.toString();
@@ -33,6 +34,7 @@ export async function adminHandler(ctx: BotContext) {
 \`/admin_tx\` - Recent 10 transactions
 \`/addpromo <code> <%discount> <limit> <days> [plan_id]\`
 \`/admin_plans\` - List all plan IDs
+\`/admin_revenue [month] [year]\` - Revenue report
 `;
 
     try {
@@ -169,6 +171,135 @@ export async function adminPlansHandler(ctx: BotContext) {
         message += `  Price: ${plan.price.toLocaleString()} MMK\n`;
         message += `──────────────────\n`;
     });
+
+    await ctx.reply(message, { parse_mode: "Markdown" });
+}
+
+// --- Revenue Report ---
+const MONTH_NAMES = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+];
+
+const BYTES_PER_GB = 1073741824;
+
+function estimatePlanFromUser(user: RemnawaveUser): number {
+    // Match user to plan based on traffic limit
+    const trafficGB = user.trafficLimitBytes / BYTES_PER_GB;
+
+    // Calculate duration in days
+    const created = new Date(user.createdAt);
+    const expires = new Date(user.expireAt);
+    const durationDays = Math.round((expires.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Find matching plan
+    for (const plan of SERVICE_PLANS) {
+        const planDays = plan.type === 'ONE_MONTH' ? 30 : plan.type === 'THREE_MONTHS' ? 90 : 180;
+        const isUnlimited = plan.dataLimitEN.toLowerCase().includes('unlimited');
+        const planTrafficGB = isUnlimited ? 0 : parseInt(plan.dataLimitEN.match(/\d+/)?.[0] || '0');
+
+        // Match by duration (within 10 days tolerance) and traffic
+        if (Math.abs(durationDays - planDays) <= 10) {
+            if (isUnlimited && user.trafficLimitBytes === 0) {
+                return plan.price;
+            }
+            if (!isUnlimited && Math.abs(trafficGB - planTrafficGB) <= 10) {
+                return plan.price;
+            }
+        }
+    }
+
+    // Fallback: use average price
+    return 10000;
+}
+
+export async function adminRevenueHandler(ctx: BotContext) {
+    if (!isAdmin(ctx)) return;
+
+    // Parse arguments: /admin_revenue [month] [year]
+    const args = ctx.message?.text?.split(/\s+/) || [];
+    const now = new Date();
+    let month = now.getMonth() + 1; // 1-12
+    let year = now.getFullYear();
+
+    if (args[1]) {
+        const parsedMonth = parseInt(args[1]);
+        if (parsedMonth >= 1 && parsedMonth <= 12) {
+            month = parsedMonth;
+        }
+    }
+    if (args[2]) {
+        const parsedYear = parseInt(args[2]);
+        if (parsedYear >= 2020 && parsedYear <= 2100) {
+            year = parsedYear;
+        }
+    }
+
+    const monthName = MONTH_NAMES[month - 1];
+    await ctx.reply(`⏳ Generating revenue report for ${monthName} ${year}...`);
+
+    // 1. Bot Revenue (from transactions.json)
+    const botRevenue = getMonthlyRevenue(year, month);
+
+    // 2. Panel Revenue (from Remnawave API)
+    let panelUsers: RemnawaveUser[] = [];
+    let panelNewThisMonth = 0;
+    let panelActiveThisMonth = 0;
+    let panelEstimatedRevenue = 0;
+
+    try {
+        panelUsers = await getAllRemnawaveUsers();
+
+        // Get first and last day of target month for filtering
+        const monthStart = new Date(year, month - 1, 1);
+        const monthEnd = new Date(year, month, 0, 23, 59, 59);
+
+        // NEW subscriptions created in this month (revenue is counted here)
+        const usersCreatedThisMonth = panelUsers.filter(u => {
+            const created = new Date(u.createdAt);
+            return created.getFullYear() === year && (created.getMonth() + 1) === month;
+        });
+
+        // ACTIVE subscriptions (bought before/during this month, still valid)
+        const usersActiveThisMonth = panelUsers.filter(u => {
+            const created = new Date(u.createdAt);
+            const expires = new Date(u.expireAt);
+            return created <= monthEnd && expires >= monthStart;
+        });
+
+        panelNewThisMonth = usersCreatedThisMonth.length;
+        panelActiveThisMonth = usersActiveThisMonth.length;
+
+        // Revenue is ONLY from users created this month
+        for (const user of usersCreatedThisMonth) {
+            panelEstimatedRevenue += estimatePlanFromUser(user);
+        }
+    } catch (error) {
+        console.error("Failed to fetch panel users for revenue report:", error);
+    }
+
+    // Format numbers
+    const formatMMK = (n: number) => n.toLocaleString() + " MMK";
+
+    const message = `
+📊 *Revenue Report - ${monthName} ${year}*
+
+🤖 *Bot Revenue (New Sales):*
+├ Keys Sold: \`${botRevenue.keysSold}\`
+├ Total: \`${formatMMK(botRevenue.totalRevenue)}\`
+└ Avg/Key: \`${botRevenue.keysSold > 0 ? formatMMK(Math.round(botRevenue.totalRevenue / botRevenue.keysSold)) : 'N/A'}\`
+
+🌐 *Panel Stats:*
+├ Total Users: \`${panelUsers.length}\`
+├ 🆕 New This Month: \`${panelNewThisMonth}\`
+├ ✅ Active This Month: \`${panelActiveThisMonth}\`
+└ 💰 New Sales: \`${formatMMK(panelEstimatedRevenue)}\`
+
+📈 *Combined New Sales:* \`${formatMMK(botRevenue.totalRevenue + panelEstimatedRevenue)}\`
+
+ℹ️ _3/6 လ plan = ဝယ်တဲ့လမှာပဲ revenue တွက်ထားပြီး_
+💡 _/admin\_revenue \[month\] \[year\]_
+`;
 
     await ctx.reply(message, { parse_mode: "Markdown" });
 }
