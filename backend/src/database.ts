@@ -265,13 +265,15 @@ export function addPromoCode(code: string, discount: number, limit: number, expi
 }
 
 // --- Transaction Stats ---
-export function getTransactionStats(): { total: number; completed: number; failed: number; pending: number } {
+export function getTransactionStats(): { total: number; completed: number; failed: number; pending: number; totalRevenue: number } {
     const db = loadDb();
+    const completedTxs = db.transactions.filter(t => t.status === 'completed');
     return {
         total: db.transactions.length,
-        completed: db.transactions.filter(t => t.status === 'completed').length,
+        completed: completedTxs.length,
         failed: db.transactions.filter(t => t.status === 'failed').length,
-        pending: db.transactions.filter(t => t.status === 'pending').length
+        pending: db.transactions.filter(t => t.status === 'pending').length,
+        totalRevenue: completedTxs.reduce((sum, t) => sum + (t.amount || 0), 0)
     };
 }
 
