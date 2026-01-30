@@ -271,9 +271,21 @@ export async function adminRevenueHandler(ctx: BotContext) {
         panelActiveThisMonth = usersActiveThisMonth.length;
 
         // Revenue is ONLY from users created this month
+        // AND we must exclude users created by the Bot (description starts with "Wavy:")
+        // to avoid double counting and incorrect pricing (since bot revenue is already accurate)
+        let manualPanelSalesCount = 0;
+
         for (const user of usersCreatedThisMonth) {
-            panelEstimatedRevenue += estimatePlanFromUser(user);
+            const isBotUser = user.description && user.description.startsWith("Wavy:");
+
+            if (!isBotUser) {
+                panelEstimatedRevenue += estimatePlanFromUser(user);
+                manualPanelSalesCount++;
+            }
         }
+
+        // Adjust "New This Month" display if needed, but for "Panel Stats" usually we show TOTAL.
+        // However, for Revenue, we strictly separate them.
     } catch (error) {
         console.error("Failed to fetch panel users for revenue report:", error);
     }
@@ -284,21 +296,24 @@ export async function adminRevenueHandler(ctx: BotContext) {
     const message = `
 📊 *Revenue Report - ${monthName} ${year}*
 
-🤖 *Bot Revenue (New Sales):*
+🤖 *Bot Sales:*
 ├ Keys Sold: \`${botRevenue.keysSold}\`
-├ Total: \`${formatMMK(botRevenue.totalRevenue)}\`
+├ Revenue: \`${formatMMK(botRevenue.totalRevenue)}\`
 └ Avg/Key: \`${botRevenue.keysSold > 0 ? formatMMK(Math.round(botRevenue.totalRevenue / botRevenue.keysSold)) : 'N/A'}\`
 
-🌐 *Panel Stats:*
-├ Total Users: \`${panelUsers.length}\`
-├ 🆕 New This Month: \`${panelNewThisMonth}\`
-├ ✅ Active This Month: \`${panelActiveThisMonth}\`
-└ 💰 New Sales: \`${formatMMK(panelEstimatedRevenue)}\`
+🌐 *Panel Direct Sales (Estimated):*
+├ New Users: \`${panelNewThisMonth - botRevenue.keysSold}\` (Manual)
+├ Revenue: \`${formatMMK(panelEstimatedRevenue)}\`
+└ Non-Bot Only
 
-📈 *Combined New Sales:* \`${formatMMK(botRevenue.totalRevenue + panelEstimatedRevenue)}\`
+📈 *Combined Revenue:* \`${formatMMK(botRevenue.totalRevenue + panelEstimatedRevenue)}\`
 
-ℹ️ _3/6 လ plan = ဝယ်တဲ့လမှာပဲ revenue တွက်ထားပြီး_
-💡 _/admin\_revenue \[month\] \[year\]_
+📋 *Overall Stats:*
+├ Total Active Users: \`${panelActiveThisMonth}\`
+└ Total Users (All Time): \`${panelUsers.length}\`
+
+ℹ️ _Bot users excluded from Panel Revenue to prevent double counting._
+💡 Usage: /admin\\_revenue [month] [year]
 `;
 
     await ctx.reply(message, { parse_mode: "Markdown" });

@@ -224,30 +224,62 @@ export interface RemnawaveUser {
 }
 
 interface RemnawaveUsersResponse {
-  response: RemnawaveUser[];
+  response: {
+    total: number;
+    users: RemnawaveUser[];
+  };
 }
 
 export async function getAllRemnawaveUsers(): Promise<RemnawaveUser[]> {
   const apiUrl = config.remnawaveApiUrl.replace(/\/+$/, "");
   const apiKey = config.remnawaveApiKey;
-  const endpoint = `${apiUrl}/api/users`;
+  const limit = 100;
+  let offset = 0;
+  let allUsers: RemnawaveUser[] = [];
+  let totalUsers = 0;
 
   try {
-    const data = await httpJson<RemnawaveUsersResponse>(endpoint, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-        Accept: "application/json"
-      }
-    });
+    // Loop until we have fetched all users
+    while (true) {
+      // NestJS commonly uses 'take' and 'skip' for pagination
+      const endpoint = `${apiUrl}/api/users?take=${limit}&skip=${offset}`;
 
-    if (!data.response || !Array.isArray(data.response)) {
-      console.error("Malformed Remnawave users response:", data);
-      return [];
+      const data = await httpJson<RemnawaveUsersResponse>(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          Accept: "application/json"
+        }
+      });
+
+      if (!data.response || !data.response.users || !Array.isArray(data.response.users)) {
+        console.error("Malformed Remnawave users response:", data);
+        break;
+      }
+
+      const users = data.response.users;
+      allUsers = allUsers.concat(users);
+      totalUsers = data.response.total || 0;
+
+      // If we received fewer users than the limit, we've reached the end
+      if (users.length < limit) {
+        break;
+      }
+
+      // Also break if we have fetched equal to or more than total (safety check)
+      if (totalUsers > 0 && allUsers.length >= totalUsers) {
+        break;
+      }
+
+      offset += limit;
     }
 
-    return data.response;
+    // Log for debugging
+    console.log(`Fetched ${allUsers.length} users from Remnawave (Total reported: ${totalUsers})`);
+
+    return allUsers;
+
   } catch (error: any) {
     if (error instanceof HttpError) {
       console.error("Failed to fetch Remnawave users:", {
@@ -257,6 +289,7 @@ export async function getAllRemnawaveUsers(): Promise<RemnawaveUser[]> {
     } else {
       console.error("Unexpected error fetching Remnawave users:", error);
     }
-    return [];
+    // Return whatever we managed to fetch so far, or empty logic handles it
+    return allUsers;
   }
 }
