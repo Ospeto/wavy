@@ -1,0 +1,24 @@
+services:
+  # Telegram Bot
+  wavy-bot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: wavy-bot
+    restart: unless-stopped
+    volumes:
+      # Persist database
+      - wavy-data:/app/data
+    environment:
+      NODE_ENV: production
+      REMNAWAVE_API_URL: ${REMNAWAVE_API_URL:-https://rempanel.yamoe.xyz}
+      REMNAWAVE_API_KEY: ${REMNAWAVE_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DB_PATH: /app/data/transactions.db
+    env_file:
+      - .env
+
+volumes:
+  wavy-data:
+    driver: local
