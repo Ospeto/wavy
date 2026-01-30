@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { config } from "./config.js";
+import { getGeminiModel } from "./database.js";
 
 export interface VerificationResult {
   isValid: boolean;
@@ -84,7 +85,7 @@ export async function verifyPaymentSlipOnServer(
     : "";
 
   try {
-    const modelId = "gemini-2.5-flash";
+    const modelId = getGeminiModel();
     const prompt = `
 FRAUD DETECTION TASK - Analyze this Myanmar mobile payment screenshot.
 Expected Payment: ${expectedAmount.toLocaleString()} MMK

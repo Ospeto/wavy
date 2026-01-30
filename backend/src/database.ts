@@ -46,10 +46,16 @@ export interface PromoCode {
     applicable_plan_ids?: string[];
 }
 
+
+export interface Settings {
+    gemini_model: string;
+}
+
 interface Database {
     transactions: TransactionRecord[];
     users: User[];
     promocodes: PromoCode[];
+    settings: Settings;
     nextId: number;
 }
 
@@ -78,6 +84,9 @@ function loadDb(): Database {
             if (!db.transactions) db.transactions = [];
             if (!db.users) db.users = [];
             if (!db.promocodes) db.promocodes = [];
+            if (!db.settings) {
+                db.settings = { gemini_model: "gemini-2.5-flash" };
+            }
             if (!db.nextId) db.nextId = db.transactions.length > 0 ? Math.max(...db.transactions.map(t => t.id)) + 1 : 1;
 
             dbCache = db;
@@ -87,10 +96,11 @@ function loadDb(): Database {
     } catch (error) {
         console.error('Error loading database:', error);
     }
-    const freshDb = {
+    const freshDb: Database = {
         transactions: [],
         users: [],
         promocodes: [],
+        settings: { gemini_model: "gemini-2.5-flash" },
         nextId: 1
     };
     dbCache = freshDb;
@@ -298,6 +308,21 @@ export function resetTransactions(): void {
     dbCache = null;
     cacheTimestamp = 0;
     console.log('🗑️ Transactions reset successfully');
+}
+
+// --- Settings Management ---
+export function getGeminiModel(): string {
+    const db = loadDb();
+    return db.settings?.gemini_model || "gemini-2.5-flash";
+}
+
+export function setGeminiModel(model: string): void {
+    const db = loadDb();
+    if (!db.settings) {
+        db.settings = { gemini_model: "gemini-2.5-flash" };
+    }
+    db.settings.gemini_model = model;
+    saveDb(db);
 }
 
 console.log('📊 Database initialized at:', dbPath);

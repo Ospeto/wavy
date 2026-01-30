@@ -430,6 +430,47 @@ export async function handleAdminCallback(ctx: BotContext) {
     }
 }
 
+// --- Gemini Model Management ---
+import { getGeminiModel, setGeminiModel } from "../../database.js";
+
+export async function adminModelHandler(ctx: BotContext) {
+    if (!isAdmin(ctx)) return;
+
+    const args = ctx.message?.text?.split(/\s+/);
+    const validModels = [
+        "gemini-2.5-flash",
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview"
+    ];
+
+    // If no args, show current model
+    if (!args || args.length < 2) {
+        const currentModel = getGeminiModel();
+        const msg = `
+🤖 *Gemini Model Configuration*
+
+Current Model: \`${currentModel}\`
+
+*Available Models:*
+${validModels.map(m => `• \`${m}\``).join('\n')}
+
+Usage: \`/admin_model <model_name>\`
+`;
+        await ctx.reply(msg, { parse_mode: "Markdown" });
+        return;
+    }
+
+    const newModel = args[1].trim();
+
+    if (!validModels.includes(newModel)) {
+        await ctx.reply(`❌ Invalid model name.\n\n*Available:* \n${validModels.map(m => `\`${m}\``).join('\n')}`, { parse_mode: "Markdown" });
+        return;
+    }
+
+    setGeminiModel(newModel);
+    await ctx.reply(`✅ *Success!* Gemini model set to: \`${newModel}\``, { parse_mode: "Markdown" });
+}
+
 // Generate monthly report message (standalone, no context needed)
 export async function generateMonthlyReport(year: number, month: number): Promise<string> {
     const monthName = MONTH_NAMES[month - 1];

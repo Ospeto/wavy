@@ -2,6 +2,7 @@ import { Context, SessionFlavor, InlineKeyboard } from "grammy";
 import { verifyPaymentSlipOnServer } from "../../gemini.js";
 import { createAccessKeyOnRemnawave, ServicePlan } from "../../remnawave.js";
 import { SERVICE_PLANS } from "../constants.js";
+import { startHandler } from "./start.js";
 import { translations } from "../translations.js";
 import {
     createTransaction,
@@ -221,6 +222,9 @@ ${t.thank_you}
                 reply_markup: keyboard
             });
 
+            // Auto-start to menu
+            await startHandler(ctx);
+
             // Reset session
             ctx.session.awaitingPaymentProof = false;
             ctx.session.selectedPlanId = undefined;
@@ -270,6 +274,9 @@ ${t.thank_you}
                 parse_mode: "Markdown",
                 reply_markup: keyboard
             });
+
+            // Auto-start to menu
+            await startHandler(ctx);
         }
 
     } catch (error: any) {

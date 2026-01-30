@@ -5,7 +5,7 @@ import { plansHandler, planCallbackHandler } from "./handlers/plans.js";
 import { paymentCallbackHandler } from "./handlers/payment.js";
 import { photoHandler } from "./handlers/verify.js";
 import { helpHandler } from "./handlers/help.js";
-import { adminHandler, adminTxHandler, addPromoHandler, adminPlansHandler, adminRevenueHandler, adminResetTxHandler, handleAdminCallback, startMonthlyReportScheduler } from "./handlers/admin.js";
+import { adminHandler, adminTxHandler, addPromoHandler, adminPlansHandler, adminRevenueHandler, adminResetTxHandler, handleAdminCallback, startMonthlyReportScheduler, adminModelHandler } from "./handlers/admin.js";
 import { translations } from "./translations.js";
 import {
     getPromoCode,
@@ -80,6 +80,7 @@ bot.command("addpromo", addPromoHandler);
 bot.command("admin_plans", adminPlansHandler);
 bot.command("admin_revenue", adminRevenueHandler);
 bot.command("admin_reset_tx", adminResetTxHandler);
+bot.command("admin_model", adminModelHandler);
 bot.command("language", async (ctx) => {
     const { InlineKeyboard } = await import("grammy");
     const keyboard = new InlineKeyboard()
