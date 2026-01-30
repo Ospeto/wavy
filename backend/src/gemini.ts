@@ -96,63 +96,42 @@ Expected Payment App: ${expectedApp}${discountContext}
 - NEVER flag 'Future Date', 'Old Date', or any date-related issue.
 - The date and time are IRRELEVANT and MUST BE IGNORED COMPLETELY.
 
-=== CRITICAL: PAYMENT APP MATCHING ===
+=== PAYMENT APP MATCHING ===
 User selected: ${expectedApp}
-You MUST detect which app the screenshot is from:
-- KBZPay/KPay: Blue theme, KBZ branding, "KBZ" logo
+- KBZPay/KPay: Blue theme, KBZ branding
 - Wave Money: Yellow/orange theme, Wave logo
 - Aya Pay: Red theme, Aya branding
 
-If the screenshot is from a DIFFERENT app than selected, REJECT IT IMMEDIATELY.
-Example: If user selected "Wave Money" but screenshot shows KBZPay blue interface, REJECT.
+If the screenshot is from a DIFFERENT app, REJECT IT.
 
-=== MANDATORY RECIPIENT INFO ===
-The payment MUST be sent to the following recipient:
-- Name: Moe Kyaw Aung
-- Phone: Must end with '2220' (e.g., *******2220 or 09766072220)
-REJECT the payment if the recipient name does not match exactly or the phone number doesn't end in 2220.
+=== RECIPIENT CHECK (STRICT) ===
+You must verify the recipient details EXACTLY:
+1. Name: Must be "Moe Kyaw Aung"
+2. Phone: Must end with '2220' (e.g., *******2220 or 09766072220)
+
+REJECT IMMEDIATELY if the name is different or the phone number does not end in 2220.
+
+=== AMOUNT CHECK ===
+- Amount MUST be >= ${expectedAmount.toLocaleString()} MMK.
+- Ignore negative signs (e.g., -10000 is valid).
 
 === KEYWORD RESTRICTIONS ===
-- REJECT the payment if the "Note", "Description", or "Reference" field contains the word "VPN".
-- This is a CRITICAL rule. If you see "VPN" anywhere in the text fields related to user input, set isValid=FALSE.
+- REJECT if "Note" or "Description" contains "VPN".
 
-=== FRAUD DETECTION (STILL REQUIRED) ===
-- REJECT if font styles are inconsistent (look for digital editing).
-- REJECT if there is pixelation or artifacts around numbers (ignore pixelation around dates).
-- REJECT if the interface looks like a digital mockup rather than a real app.
-- REJECT if the app colors/theme do not match (e.g., KBZPay blue vs Aya red).
-
-=== IMAGE AUTHENTICITY CHECKS ===
-Check for signs of photo manipulation:
-- Inconsistent fonts, pixelation around numbers, misaligned text.
-- Text that looks digitally inserted or "too clean".
-- Screenshot of a screenshot or cropped edges.
-
-=== PAYMENT STATUS & AMOUNT ===
-- Status MUST be SUCCESS (checkmark, "Success", "ငွေလွှဲပြီးပါပြီ").
-- Amount MUST be EXACTLY ${expectedAmount.toLocaleString()} MMK or more.
-- IMPORTANT: The amount may appear with a NEGATIVE sign (e.g., -${expectedAmount.toLocaleString()} Ks) because it is a debit from the sender's account. This is NORMAL and SHOULD BE ACCEPTED as long as the absolute value matches.
-
-=== TRANSACTION ID ===
-- Extraction is MANDATORY. Reject if no transaction ID is found.
+=== FRAUD DETECTION ===
+- REJECT if font styles are inconsistent.
+- REJECT if the interface looks like a fake generator.
 
 === FINAL DECISION ===
 Set isValid=TRUE only if:
-1. Payment app matches ${expectedApp}
-2. Recipient matches Moe Kyaw Aung and phone ends in 2220
-3. No signs of editing or fraud
-4. Status is SUCCESS and Amount is correct
-5. Transaction ID is extracted
-6. THE NOTE/DESCRIPTION DOES NOT CONTAIN THE WORD "VPN"
-7. Confidence >= 0.8
-
-IMPORTANT: 
-- NEVER INCLUDE DATE OR TIME ISSUES IN 'fraudIndicators' OR 'reason'.
-- RECIPIENT NAME MUST MATCH EXACTLY.
-- RECIPIENT PHONE MUST END IN 2220.
-- REJECT IMMEDIATELY IF "VPN" IS IN THE NOTE.
-- Set detectedPaymentApp to: "KBZPay", "Wave", "AyaPay", or "Unknown".
-    `;
+1. App matches
+2. Recipient Name matches "Moe Kyaw Aung"
+3. Recipient Phone ends with "2220"
+4. Amount is correct
+5. NO "VPN" in notes
+6. Status is SUCCESS
+7. Transaction ID is visible
+`;
 
     const response = await ai.models.generateContent({
       model: modelId,
