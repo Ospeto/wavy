@@ -120,7 +120,7 @@ export const translations: Record<Language, Translation> = {
         step_3: "3. Take a screenshot of the successful payment",
         step_4: "4. Send the screenshot here",
         waiting_screenshot: "⏳ *Waiting for your payment screenshot...*",
-        vpn_warning: "⚠️ **IMPORTANT:** Do **NOT** write the word \"VPN\" in the payment note/description. If this keyword is detected, your payment will be rejected and no key will be issued.",
+        vpn_warning: "⚠️ *IMPORTANT:* Do *NOT* write the word \"VPN\" in the payment note/description. If this keyword is detected, your payment will be rejected and no key will be issued.",
         auto_generation_note: "_Your subscription key will be generated automatically after verification._",
 
         verifying_payment: "🔄 *Verifying your payment...*",
@@ -159,7 +159,7 @@ export const translations: Record<Language, Translation> = {
         how_to_step_4: "4. Open the app, add a new subscription, and paste your URL.",
         how_to_step_5: "5. Connect and enjoy!",
         open_link_label: "🔗 Open Subscription Link",
-        server_switch_warning: "⚠️ **WARNING:** Do not switch countries (servers) too fast! Rapidly changing your location may cause Facebook to temporarily disable your account for security reasons.",
+        server_switch_warning: "⚠️ *WARNING:* Do not switch countries (servers) too fast! Rapidly changing your location may cause Facebook to temporarily disable your account for security reasons.",
         thank_you: "Thank you for choosing Wavy! 🌊",
 
         help_title: "🆘 *Wavy VPN Bot Help*",
@@ -178,7 +178,7 @@ export const translations: Record<Language, Translation> = {
         get_step_5: "5. Receive your subscription URL instantly!",
         how_to_use_happ_title: "*How to use with Happ Proxy:*",
         use_step_1: "1. Copy the subscription URL you receive",
-        use_step_2: "2. Open **Happ Proxy**",
+        use_step_2: "2. Open *Happ Proxy*",
         use_step_3: "3. Tap the \"Add\" button and paste your URL",
         use_step_4: "4. Connect and enjoy your secure connection!",
         contact_support_title: "*Contact Support:*",
@@ -213,7 +213,7 @@ export const translations: Record<Language, Translation> = {
         step_3: "၃။ ငွေလွှဲအောင်မြင်ကြောင်း screenshot (ဓါတ်ပုံ) ရိုက်ထားပါ",
         step_4: "၄။ ၎င်း screenshot ကို ဤနေရာသို့ ပို့ပေးပါ",
         waiting_screenshot: "⏳ *ငွေလွှဲ screenshot ကို စောင့်ဆိုင်းနေပါသည်...*",
-        vpn_warning: "⚠️ **အရေးကြီးချက်:** ငွေလွှဲသည့်အခါ မှတ်ချက် (Note/Description) တွင် \"VPN\" ဟု **မရေးပါနှင့်**။ ထိုစာသား ပါဝင်ပါက ငွေလွှဲမှုကို ငြင်းပယ်မည်ဖြစ်ပြီး key ရရှိမည် မဟုတ်ပါ။",
+        vpn_warning: "⚠️ *အရေးကြီးချက်:* ငွေလွှဲသည့်အခါ မှတ်ချက် (Note/Description) တွင် \"VPN\" ဟု *မရေးပါနှင့်*။ ထိုစာသား ပါဝင်ပါက ငွေလွှဲမှုကို ငြင်းပယ်မည်ဖြစ်ပြီး key ရရှိမည် မဟုတ်ပါ။",
         auto_generation_note: "_ငွေလွှဲမှု မှန်ကန်ကြောင်း စစ်ဆေးပြီးပါက VPN key ကို အလိုအလျောက် ထုတ်ပေးမည်ဖြစ်ပါသည်။_",
 
         verifying_payment: "🔄 *ငွေလွှဲမှုကို စစ်ဆေးနေပါသည်...*",
@@ -252,7 +252,7 @@ export const translations: Record<Language, Translation> = {
         how_to_step_4: "၄။ App ကိုဖွင့်ပြီး subscription အသစ်ထည့်ရန် URL ကို paste လုပ်ပါ",
         how_to_step_5: "၅။ Connect နှိပ်ပြီး အသုံးပြုနိုင်ပါပြီ!",
         open_link_label: "🔗 မူရင်းလင့်ခ်ကို ဖွင့်ရန်",
-        server_switch_warning: "⚠️ **သတိပေးချက်:** ဆာဗာများကို ခဏခဏ အလွန်မြန်စွာ မပြောင်းပါနှင့်! တည်နေရာအမျိုးမျိုးသို့ ခဏချင်းပြောင်းလဲခြင်းကြောင့် သင်၏ Facebook အကောင့်ကို လုံခြုံရေးအရ ခေတ္တပိတ်ပင်ခြင်း (Disable) ခံရနိုင်ပါသည်။",
+        server_switch_warning: "⚠️ *သတိပေးချက်:* ဆာဗာများကို ခဏခဏ အလွန်မြန်စွာ မပြောင်းပါနှင့်! တည်နေရာအမျိုးမျိုးသို့ ခဏချင်းပြောင်းလဲခြင်းကြောင့် သင်၏ Facebook အကောင့်ကို လုံခြုံရေးအရ ခေတ္တပိတ်ပင်ခြင်း (Disable) ခံရနိုင်ပါသည်။",
         thank_you: "Wavy ကို ရွေးချယ်အသုံးပြုပေးသည့်အတွက် ကျေးဇူးတင်ပါသည်! 🌊",
 
         help_title: "🆘 *Wavy VPN Bot အကူအညီ*",
@@ -271,7 +271,7 @@ export const translations: Record<Language, Translation> = {
         get_step_5: "၅။ သင်၏ VPN key ကို ချက်ချင်း ရရှိပါမည်!",
         how_to_use_happ_title: "*Happ Proxy ဖြင့် အသုံးပြုနည်း:*",
         use_step_1: "၁။ ရရှိလာသော subscription URL ကို copy ယူပါ",
-        use_step_2: "၂။ **Happ Proxy** app ကိုဖွင့်ပါ",
+        use_step_2: "၂။ *Happ Proxy* app ကိုဖွင့်ပါ",
         use_step_3: "၃။ \"Add\" ကိုနှိပ်ပြီး URL ကို paste လုပ်ပါ",
         use_step_4: "၄။ Connect လုပ်ပြီး အသုံးပြုနိုင်ပါပြီ!",
         contact_support_title: "*အကူအညီ ရယူရန်:*",
