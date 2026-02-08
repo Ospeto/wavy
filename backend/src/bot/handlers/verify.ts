@@ -197,7 +197,7 @@ ${t.subscription_ready}
 🆔 *${t.transaction_label}:* \`${verificationResult.transactionId || 'N/A'}\`
 
 🔑 *${t.your_key_label}:*
-${accessKey.key}
+${accessKey.key.replace(/_/g, '\\_')}
 
 *(Tap the link above to open, or tap below to copy)*
 \`${accessKey.key}\`

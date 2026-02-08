@@ -10,7 +10,7 @@ export async function helpHandler(ctx: BotContext) {
 ${t.help_title}
 
 ${t.vpn_client_title}
-Our system works best with the **Happ Proxy** app.
+Our system works best with the *Happ Proxy* app.
 • [${t.happ_proxy_android}](https://play.google.com/store/apps/details?id=com.happproxy&hl=en)
 • [${t.happ_proxy_ios}](https://apps.apple.com/sg/app/happ-proxy-utility/id6504287215)
 
